@@ -1,0 +1,14 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>Administrador</h1><p>Crea y controla los códigos de acceso.</p>
+<input id="key" type="password" placeholder="Clave de administrador">
+<input id="label" placeholder="Nombre del cliente (opcional)">
+<input id="days" type="number" value="5" placeholder="Días de duración">
+<button onclick="mk()">Crear código</button><div id="new" class="box hide"></div>
+<button class="sec" onclick="ls()">Ver códigos</button><div id="list"></div>
+<script>
+const $=i=>document.getElementById(i),H=()=>({'Content-Type':'application/json','x-admin':$('key').value});
+async function mk(){const r=await fetch('/api/admin/code',{method:'POST',headers:H(),body:JSON.stringify({days:$('days').value,label:$('label').value})});const j=await r.json();if(!r.ok)return alert(j.error);$('new').classList.remove('hide');$('new').innerHTML='Código nuevo: <b style="font-size:1.4rem">'+j.code+'</b>';ls()}
+async function ls(){const r=await fetch('/api/admin/codes',{headers:H()});const j=await r.json();if(!r.ok)return alert(j.error);
+$('list').innerHTML=Object.entries(j).map(([c,v])=>`<div class="box"><b>${c}</b> ${v.label||''}<br>${v.days} días · ${v.blocked?'🔒 bloqueado':v.expiresAt?'vence '+new Date(v.expiresAt).toLocaleString():'sin usar'}<br><button class="sec" onclick="del('${c}')">Borrar</button></div>`).join('')||'Sin códigos'}
+async function del(c){if(!confirm('¿Borrar '+c+'?'))return;await fetch('/api/admin/code/'+c,{method:'DELETE',headers:H()});ls()}
+</script></body></html>

@@ -1,0 +1,31 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Panel de anuncios</title><link rel="stylesheet" href="style.css"></head><body>
+<div id="login"><h1>Entrar</h1><p>Escribe el código de acceso que te dieron.</p>
+<input id="code" placeholder="Código" autocapitalize="characters"><button onclick="login()">Entrar</button><div id="lerr" class="err"></div></div>
+
+<div id="panel" class="hide"><h1>Tu panel</h1><p id="exp"></p>
+<div class="box"><b>1. Conectar WhatsApp</b><div id="st">Cargando…</div><img id="qr" class="qr hide" alt="QR de WhatsApp"><p id="qh" class="hide">En tu celular: WhatsApp → Dispositivos vinculados → Vincular dispositivo → escanea el QR.</p></div>
+
+<div id="ads" class="hide"><div class="box"><b>2. Crear anuncio</b><br><br>
+<button class="sec" onclick="loadGroups()">Cargar mis grupos</button>
+<label><input type="checkbox" id="all" onchange="toggleAll()" style="width:auto"> Seleccionar todos</label>
+<div id="groups" class="list"></div>
+<textarea id="text" rows="5" placeholder="Texto del anuncio"></textarea>
+<input id="phone" placeholder="Tu número para el botón Contactar (ej: 573001234567)" inputmode="numeric">
+<input id="img" type="file" accept="image/*">
+<button onclick="send()">Enviar anuncio</button><div id="prog"></div></div></div></div>
+<script>
+let code=localStorage.code||'',img=null;const $=i=>document.getElementById(i);
+const H=()=>({'Content-Type':'application/json','x-code':code});
+async function api(p,o={}){const r=await fetch(p,{headers:H(),...o});const j=await r.json();if(r.status===401){localStorage.clear();location.reload()}return j}
+async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:$('code').value})});const j=await r.json();if(!r.ok){$('lerr').textContent=j.error;return}code=j.code;localStorage.code=code;localStorage.exp=j.expiresAt;init()}
+function init(){$('login').classList.add('hide');$('panel').classList.remove('hide');$('exp').textContent='Tu acceso vence el '+new Date(+localStorage.exp).toLocaleString();poll();setInterval(poll,4000)}
+async function poll(){const s=await api('/api/status');const open=s.status==='open';$('st').textContent=open?'✅ WhatsApp conectado':s.status==='qr'?'Escanea este QR:':'Preparando conexión…';
+$('qr').classList.toggle('hide',!s.qr);$('qh').classList.toggle('hide',!s.qr);if(s.qr)$('qr').src=s.qr;$('ads').classList.toggle('hide',!open)}
+async function loadGroups(){const g=await api('/api/groups');$('groups').innerHTML=g.map(x=>`<label><input type="checkbox" value="${x.id}"> ${x.name.replace(/</g,'&lt;')}</label>`).join('')||'Sin grupos'}
+function toggleAll(){document.querySelectorAll('#groups input').forEach(c=>c.checked=$('all').checked)}
+$('img').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>img=r.result;r.readAsDataURL(f)}
+async function send(){const jids=[...document.querySelectorAll('#groups input:checked')].map(c=>c.value);if(!jids.length)return alert('Elige al menos un grupo');
+const j=await api('/api/send',{method:'POST',body:JSON.stringify({jids,text:$('text').value,phone:$('phone').value,image:img})});if(j.error)return alert(j.error);
+const t=setInterval(async()=>{const p=await api('/api/progress');$('prog').textContent=`Enviados ${p.sent} de ${p.total}`;if(p.sent>=p.total)clearInterval(t)},3000)}
+if(code&&localStorage.exp)init();
+</script></body></html>
